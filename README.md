@@ -1,8 +1,7 @@
 # LoomChannel
 
-Decoupled messaging library (Pub-Sub / Mediator) in **pure C++17**, inspired by
-the messaging system created in the **JNestoPlatform** project (Java / Netbeans
-Platform), but with no coupling to wxWidgets, Qt, GTK, or any GUI framework.
+Decoupled messaging library (Pub-Sub / Mediator) in **pure C++17**, with no
+coupling to wxWidgets, Qt, GTK, or any GUI framework.
 
 ## Philosophy
 
@@ -114,7 +113,7 @@ This model is intentional: the **sender owns the data**, the channel lends the r
 
 ## Comparison with the original Java
 
-| Aspect | Java (JNestoPlatform) | C++17 (LoomChannel) |
+| Aspect | Legacy Java system | C++17 (LoomChannel) |
 |--------|----------------------|---------------------|
 | Payload | `Object` | `std::any` (delivered as `const std::any&`) |
 | Listener | anonymous interface | `std::shared_ptr<Subscriber>` or `make_subscriber(lambda)` |
