@@ -17,7 +17,7 @@ namespace loomchannel {
  * @brief Contract for a message receiver.
  *
  * Implementations receive notifications through `on_message`.
- * The payload is `std::any` (equivalent to Java's `Object`), allowing any
+ * The payload is `std::any`, allowing any
  * data type to be transported through the channel without coupling sender
  * and receiver to a common type at compile time.
  */

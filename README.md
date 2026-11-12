@@ -109,19 +109,7 @@ void on_message(void* sender, MessageEvent event, const std::any& payload) overr
 }
 ```
 
-This model is intentional: the **sender owns the data**, the channel lends the reference during delivery, and receivers are temporary observers. This matches successful patterns such as: a screen selects a client key, publishes `"123"` on a channel, and a "Previous Purchases" module receives the key, lists the last 5 purchases, and displays them — without anyone retaining the payload.
-
-## Comparison with the original Java
-
-| Aspect | Legacy Java system | C++17 (LoomChannel) |
-|--------|----------------------|---------------------|
-| Payload | `Object` | `std::any` (delivered as `const std::any&`) |
-| Listener | anonymous interface | `std::shared_ptr<Subscriber>` or `make_subscriber(lambda)` |
-| Singleton | via `Lookup` | `Bus::instance()` (Meyer's singleton) |
-| Thread-safety | synchronized maps | `std::mutex` + snapshot |
-| GUI | `TopComponent` (Netbeans) | none (pure C++; UI decides how to consume) |
-| Unsubscription | manual | `Connection` RAII automatic |
-| Ordered delivery | not available | `OrderedChannel` for strict in-order delivery |
+This model is intentional: the **sender owns the data**, the channel lends the reference during delivery, and receivers are temporary observers.
 
 ## License
 
