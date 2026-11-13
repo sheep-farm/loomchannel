@@ -15,23 +15,20 @@ const std::string& OrderedChannel::id() const { return id_; }
 void* OrderedChannel::sender() const { return sender_; }
 
 Channel& OrderedChannel::set_open(bool open) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (open_ == open)
-        return *this;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (open_ == open)
+            return *this;
 
-    open_ = open;
+        open_ = open;
 
-    if (open_) {
-        queue_.push({MessageEvent::Broadcast, content_});
-    } else {
-        queue_.push({MessageEvent::Stop, std::any{}});
+        if (open) {
+            queue_.push({MessageEvent::Broadcast, content_});
+        } else {
+            queue_.push({MessageEvent::Stop, std::any{}});
+        }
     }
-
-    if (!delivering_) {
-        delivering_ = true;
-        deliver_queued();
-        delivering_ = false;
-    }
+    pump();
     return *this;
 }
 
@@ -41,15 +38,12 @@ bool OrderedChannel::is_open() const {
 }
 
 Channel& OrderedChannel::set_content(std::any content) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    content_ = std::move(content);
-    queue_.push({MessageEvent::Broadcast, content_});
-
-    if (!delivering_) {
-        delivering_ = true;
-        deliver_queued();
-        delivering_ = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        content_ = std::move(content);
+        queue_.push({MessageEvent::Broadcast, content_});
     }
+    pump();
     return *this;
 }
 
@@ -59,17 +53,13 @@ std::any OrderedChannel::content() const {
 }
 
 void OrderedChannel::broadcast() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!open_)
-        return;
-
-    queue_.push({MessageEvent::Broadcast, content_});
-
-    if (!delivering_) {
-        delivering_ = true;
-        deliver_queued();
-        delivering_ = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!open_)
+            return;
+        queue_.push({MessageEvent::Broadcast, content_});
     }
+    pump();
 }
 
 void OrderedChannel::add_subscriber(std::shared_ptr<Subscriber> subscriber) {
@@ -82,70 +72,71 @@ void OrderedChannel::add_subscriber(
     if (!subscriber)
         return;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    if (std::find(subscribers_.begin(), subscribers_.end(), subscriber) !=
-        subscribers_.end()) {
-        return;
+        if (std::find(subscribers_.begin(), subscribers_.end(), subscriber) !=
+            subscribers_.end()) {
+            return;
+        }
+
+        subscribers_.push_back(subscriber);
+        constraints_by_subscriber_.emplace(subscriber, constraints);
+
+        // Queues immediate delivery of current content to the new subscriber.
+        if (open_) {
+            queue_.push({MessageEvent::Broadcast, content_});
+        } else {
+            queue_.push({MessageEvent::Stop, content_});
+        }
     }
-
-    subscribers_.push_back(subscriber);
-    constraints_by_subscriber_.emplace(subscriber, std::move(constraints));
-
-    // Queues immediate delivery of current content to the new subscriber.
-    if (open_) {
-        queue_.push({MessageEvent::Broadcast, content_});
-    } else {
-        queue_.push({MessageEvent::Stop, content_});
-    }
-
-    if (!delivering_) {
-        delivering_ = true;
-        deliver_queued();
-        delivering_ = false;
-    }
+    pump();
 }
 
 void OrderedChannel::remove_subscriber(std::shared_ptr<Subscriber> subscriber) {
     if (!subscriber)
         return;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    auto it = std::find(subscribers_.begin(), subscribers_.end(), subscriber);
-    if (it == subscribers_.end())
-        return;
+        if (std::find(subscribers_.begin(), subscribers_.end(), subscriber) ==
+            subscribers_.end()) {
+            return;
+        }
 
-    // Notifies Stop to all subscribers before clearing.
-    queue_.push({MessageEvent::Stop, content_});
-
-    if (!delivering_) {
-        delivering_ = true;
-        deliver_queued();
-        delivering_ = false;
+        // Notifies Stop to all subscribers (including the one being removed)
+        // while it is still registered.
+        queue_.push({MessageEvent::Stop, content_});
     }
+    pump();
 
-    subscribers_.erase(it);
-    constraints_by_subscriber_.erase(subscriber);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = std::find(subscribers_.begin(), subscribers_.end(), subscriber);
+        if (it != subscribers_.end()) {
+            subscribers_.erase(it);
+        }
+        constraints_by_subscriber_.erase(subscriber);
+    }
 }
 
 void OrderedChannel::reset() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    // Notifies Stop to all subscribers before clearing.
-    for (auto& sub : subscribers_) {
-        (void)sub;
-        queue_.push({MessageEvent::Stop, content_});
+        // Notifies Stop to all subscribers before clearing.
+        for (size_t i = 0; i < subscribers_.size(); ++i) {
+            queue_.push({MessageEvent::Stop, content_});
+        }
     }
+    pump();
 
-    if (!delivering_) {
-        delivering_ = true;
-        deliver_queued();
-        delivering_ = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        subscribers_.clear();
+        constraints_by_subscriber_.clear();
     }
-
-    subscribers_.clear();
-    constraints_by_subscriber_.clear();
 }
 
 std::vector<std::shared_ptr<Subscriber>> OrderedChannel::get_subscribers() const {
@@ -154,58 +145,76 @@ std::vector<std::shared_ptr<Subscriber>> OrderedChannel::get_subscribers() const
 }
 
 void OrderedChannel::process_pending() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (delivering_)
-        return;
-    delivering_ = true;
-    deliver_queued();
-    delivering_ = false;
+    pump();
 }
 
 bool OrderedChannel::passes_constraints(
-    std::shared_ptr<Subscriber> subscriber,
-    MessageEvent event) const {
-    auto it = constraints_by_subscriber_.find(subscriber);
-    if (it == constraints_by_subscriber_.end())
-        return true;
-
-    for (auto& c : it->second) {
-        if (!c->validate(sender_, event, content_))
+    const std::vector<std::shared_ptr<Constraint>>& constraints,
+    MessageEvent event,
+    const std::any& content) const {
+    for (auto& c : constraints) {
+        if (!c->validate(sender_, event, content))
             return false;
     }
     return true;
 }
 
-void OrderedChannel::notify_subscriber(std::shared_ptr<Subscriber> subscriber,
-                                       MessageEvent event) {
+void OrderedChannel::notify_subscriber(
+    std::shared_ptr<Subscriber> subscriber,
+    MessageEvent event,
+    const std::any& content,
+    const std::vector<std::shared_ptr<Constraint>>& constraints) {
     if (!subscriber)
         return;
 
-    if (!passes_constraints(subscriber, event))
+    if (!passes_constraints(constraints, event, content))
         return;
 
     try {
-        // Passes const reference to content_; valid only for this call.
-        subscriber->on_message(sender_, event, content_);
+        // Passes const reference to content; valid only for this call.
+        subscriber->on_message(sender_, event, content);
     } catch (const std::exception& e) {
         std::cerr << "[loomchannel] subscriber threw: " << e.what() << "\n";
     }
 }
 
-void OrderedChannel::deliver_queued() {
-    // Assumimos que mutex_ já está segurado pelo chamador.
-    while (!queue_.empty()) {
-        QueuedMessage msg = std::move(queue_.front());
-        queue_.pop();
+void OrderedChannel::pump() {
+    // Only one thread drains the queue at a time; strict arrival order is
+    // preserved because the owner delivers everything until the queue is
+    // empty.
+    bool expected = false;
+    if (!delivering_.compare_exchange_strong(expected, true))
+        return;
 
-        // Atualiza content_ para o payload desta mensagem antes de notificar,
-        // mantendo passes_constraints consistente com a mensagem em entrega.
-        content_ = std::move(msg.payload);
+    for (;;) {
+        QueuedMessage msg;
+        std::vector<std::shared_ptr<Subscriber>> snapshot;
+        std::vector<std::vector<std::shared_ptr<Constraint>>> constraints;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (queue_.empty()) {
+                // Resetting the flag under the same lock as the empty check
+                // guarantees no message is left behind: any push that happened
+                // before this point is seen here; any push after it makes the
+                // pushing thread the next owner.
+                delivering_ = false;
+                return;
+            }
+            msg = std::move(queue_.front());
+            queue_.pop();
+            content_ = msg.payload; // keep content() consistent with delivery
+            snapshot = subscribers_;
+            for (auto& sub : snapshot) {
+                auto it = constraints_by_subscriber_.find(sub);
+                constraints.push_back(it != constraints_by_subscriber_.end()
+                                          ? it->second
+                                          : std::vector<std::shared_ptr<Constraint>>{});
+            }
+        }
 
-        std::vector<std::shared_ptr<Subscriber>> snapshot = subscribers_;
-
-        for (auto& sub : snapshot) {
-            notify_subscriber(sub, msg.event);
+        // Deliver outside the lock: callbacks may re-enter the channel or Bus.
+        for (size_t i = 0; i < snapshot.size(); ++i) {
+            notify_subscriber(snapshot[i], msg.event, msg.payload, constraints[i]);
         }
     }
 }

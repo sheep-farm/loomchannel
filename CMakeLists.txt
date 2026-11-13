@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(loomchannel LANGUAGES CXX)
+project(loomchannel VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+include(GNUInstallDirs)
 
 # ---------------------------------------------------------------
 # Static library (pure, no GUI dependency)
@@ -15,7 +17,8 @@ add_library(loomchannel STATIC
 )
 
 target_include_directories(loomchannel PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/loomchannel>
 )
 
 if(NOT MSVC)
@@ -59,11 +62,33 @@ endif()
 # ---------------------------------------------------------------
 # Installation
 # ---------------------------------------------------------------
-install(TARGETS loomchannel loomchannel_example
+install(TARGETS loomchannel
     RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(DIRECTORY include/ DESTINATION include/loomchannel)
 install(FILES LICENSE DESTINATION share/loomchannel)
+install(DIRECTORY include/ DESTINATION include)
+
+# ---------------------------------------------------------------
+# CMake package config for find_package(loomchannel)
+# ---------------------------------------------------------------
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/loomchannelConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/loomchannelConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/loomchannelConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/loomchannel
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/loomchannelConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/loomchannelConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/loomchannel
+)

@@ -1,50 +1,60 @@
 {
-  "tests": 11,
+  "tests": 13,
   "name": "AllTests",
   "testsuites": [
     {
       "name": "BusTest",
-      "tests": 8,
+      "tests": 10,
       "testsuite": [
         {
           "name": "OpenAndCloseChannel",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 80
+          "line": 127
         },
         {
           "name": "OpenDoesNotOverwriteExistingChannel",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 93
+          "line": 140
         },
         {
           "name": "SubscribersReceivePublishedContent",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 104
+          "line": 151
         },
         {
           "name": "BusSubscribeDoesNotCrash",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 128
+          "line": 175
         },
         {
-          "name": "OrphanSubscriberDoesNotCrash",
+          "name": "OrphanSubscriberReceivesAfterChannelOpens",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 146
+          "line": 193
         },
         {
           "name": "UnsubscribeStopsDelivery",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 176
+          "line": 225
         },
         {
           "name": "ConnectionRAIIUnsubscribesOnScopeExit",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 206
+          "line": 255
         },
         {
           "name": "ConstraintFiltersMessages",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 224
+          "line": 273
+        },
+        {
+          "name": "SubscriberCallbackCanReenterBus",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 294
+        },
+        {
+          "name": "SubscriberCallbackCanLookupChannelDuringBroadcast",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 319
         }
       ]
     },
@@ -55,12 +65,12 @@
         {
           "name": "SubscriberReceivesStopOnClose",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 248
+          "line": 340
         },
         {
           "name": "NewSubscriberGetsCurrentContent",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 263
+          "line": 355
         }
       ]
     },
@@ -71,7 +81,7 @@
         {
           "name": "MultipleThreadsPreserveAllMessages",
           "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
-          "line": 280
+          "line": 372
         }
       ]
     }

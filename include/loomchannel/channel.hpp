@@ -116,11 +116,14 @@ protected:
                        std::vector<std::shared_ptr<Constraint>>> constraints_by_subscriber_;
 
 private:
-    bool passes_constraints(std::shared_ptr<Subscriber> subscriber,
-                            MessageEvent event) const;
+    bool passes_constraints(const std::vector<std::shared_ptr<Constraint>>& constraints,
+                            MessageEvent event,
+                            const std::any& content) const;
 
     void notify_subscriber(std::shared_ptr<Subscriber> subscriber,
-                           MessageEvent event);
+                           MessageEvent event,
+                           const std::any& content,
+                           const std::vector<std::shared_ptr<Constraint>>& constraints);
 };
 
 } // namespace loomchannel

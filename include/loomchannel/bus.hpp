@@ -120,8 +120,9 @@ private:
 
     void ensure_orphan_list(std::string channel_id);
 
-    void migrate_orphans(const std::string& channel_id,
-                         std::shared_ptr<Channel> channel);
+    // Shared empty constraint list used when an orphan entry has no
+    // associated constraints.
+    const std::vector<std::vector<std::shared_ptr<Constraint>>> empty_constraints_;
 };
 
 } // namespace loomchannel

@@ -64,37 +64,70 @@ void Bus::open(std::string channel_id, std::shared_ptr<Channel> channel) {
     if (!channel)
         return;
 
-    channel->set_open(true);
-
-    std::lock_guard<std::mutex> lock(mutex_);
-
     // Do not overwrite an already open channel (preserves connected subscribers).
-    if (open_channels_.find(channel_id) == open_channels_.end()) {
-        open_channels_.emplace(channel_id, std::move(channel));
+    std::shared_ptr<Channel> target;
+    std::vector<std::pair<std::shared_ptr<Subscriber>,
+                          std::vector<std::shared_ptr<Constraint>>>>
+        orphans;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = open_channels_.find(channel_id);
+        if (it == open_channels_.end()) {
+            it = open_channels_.emplace(channel_id, channel).first;
+        }
+        target = it->second;
+
+        // Extract orphan subscribers so they can be migrated to the channel
+        // outside the Bus lock (add_subscriber notifies its subscriber).
+        auto oit = orphan_subscribers_.find(channel_id);
+        if (oit != orphan_subscribers_.end()) {
+            auto cit = orphan_constraints_.find(channel_id);
+            auto& constraints =
+                cit != orphan_constraints_.end() ? cit->second : empty_constraints_;
+            for (size_t i = 0; i < oit->second.size(); ++i) {
+                orphans.emplace_back(
+                    oit->second[i],
+                    i < constraints.size() ? constraints[i] : std::vector<std::shared_ptr<Constraint>>{});
+            }
+            oit->second.clear();
+            if (cit != orphan_constraints_.end())
+                cit->second.clear();
+            orphan_subscribers_.erase(oit);
+            if (cit != orphan_constraints_.end())
+                orphan_constraints_.erase(cit);
+        }
     }
 
-    // Migrate orphans to the now-open channel.
-    migrate_orphans(channel_id, open_channels_.at(channel_id));
+    // Outside the Bus lock: these calls notify subscribers.
+    target->set_open(true);
+    for (auto& [sub, constraints] : orphans) {
+        target->add_subscriber(sub, std::move(constraints));
+    }
 }
 
 void Bus::close(std::string channel_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_ptr<Channel> channel;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    auto it = open_channels_.find(channel_id);
-    if (it == open_channels_.end())
-        return;
+        auto it = open_channels_.find(channel_id);
+        if (it == open_channels_.end())
+            return;
 
-    auto channel = it->second;
-    channel->set_open(false); // notifies Stop to current subscribers
+        channel = it->second;
 
-    // Keep subscribers as orphans for future reopening.
-    auto subscribers = channel->get_subscribers();
-    ensure_orphan_list(channel_id);
-    for (auto& sub : subscribers) {
-        orphan_subscribers_[channel_id].push_back(sub);
+        // Keep subscribers as orphans for future reopening.
+        auto subscribers = channel->get_subscribers();
+        ensure_orphan_list(channel_id);
+        for (auto& sub : subscribers) {
+            orphan_subscribers_[channel_id].push_back(sub);
+        }
+
+        open_channels_.erase(it);
     }
 
-    open_channels_.erase(it);
+    // Outside the Bus lock: set_open(false) notifies Stop to subscribers.
+    channel->set_open(false);
 }
 
 Connection Bus::subscribe(std::string channel_id,
@@ -108,16 +141,24 @@ Connection Bus::subscribe(std::string channel_id,
     if (!subscriber)
         return {};
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_ptr<Channel> target;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-    auto it = open_channels_.find(channel_id);
-    if (it != open_channels_.end()) {
-        it->second->add_subscriber(subscriber, std::move(constraints));
-    } else {
-        // Channel does not exist yet: subscriber becomes an orphan.
-        ensure_orphan_list(channel_id);
-        orphan_subscribers_[channel_id].push_back(subscriber);
-        orphan_constraints_[channel_id].push_back(std::move(constraints));
+        auto it = open_channels_.find(channel_id);
+        if (it != open_channels_.end()) {
+            target = it->second;
+        } else {
+            // Channel does not exist yet: subscriber becomes an orphan.
+            ensure_orphan_list(channel_id);
+            orphan_subscribers_[channel_id].push_back(subscriber);
+            orphan_constraints_[channel_id].push_back(std::move(constraints));
+        }
+    }
+
+    // Outside the Bus lock: add_subscriber notifies the subscriber immediately.
+    if (target) {
+        target->add_subscriber(subscriber, std::move(constraints));
     }
 
     // Returns RAII handle. The Bus does not retain a shared_ptr to itself,
@@ -146,27 +187,37 @@ void Bus::unsubscribe(std::string channel_id,
     if (!subscriber)
         return;
 
+    std::shared_ptr<Channel> target;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        auto it = open_channels_.find(channel_id);
+        if (it != open_channels_.end()) {
+            target = it->second;
+        }
+    }
+
+    // Outside the Bus lock: remove_subscriber notifies Stop to the subscriber.
+    if (target) {
+        target->remove_subscriber(subscriber);
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(mutex_);
+    auto oit = orphan_subscribers_.find(channel_id);
+    if (oit != orphan_subscribers_.end()) {
+        auto& vec = oit->second;
+        vec.erase(std::remove(vec.begin(), vec.end(), subscriber), vec.end());
 
-    auto it = open_channels_.find(channel_id);
-    if (it != open_channels_.end()) {
-        it->second->remove_subscriber(subscriber);
-    } else {
-        auto oit = orphan_subscribers_.find(channel_id);
-        if (oit != orphan_subscribers_.end()) {
-            auto& vec = oit->second;
-            vec.erase(std::remove(vec.begin(), vec.end(), subscriber), vec.end());
+        // Clear constraints for this orphan channel (they are reapplied
+        // only when the channel opens again).
+        auto cit = orphan_constraints_.find(channel_id);
+        if (cit != orphan_constraints_.end()) {
+            orphan_constraints_.erase(cit);
+        }
 
-            // Clear constraints for this orphan channel (they are reapplied
-            // only in migrate_orphans, which does not occur here).
-            auto cit = orphan_constraints_.find(channel_id);
-            if (cit != orphan_constraints_.end()) {
-                orphan_constraints_.erase(cit);
-            }
-
-            if (vec.empty()) {
-                orphan_subscribers_.erase(oit);
-            }
+        if (vec.empty()) {
+            orphan_subscribers_.erase(oit);
         }
     }
 }
@@ -190,37 +241,6 @@ void Bus::ensure_orphan_list(std::string channel_id) {
         orphan_constraints_.emplace(channel_id,
                                     std::vector<std::vector<std::shared_ptr<Constraint>>>{});
     }
-}
-
-void Bus::migrate_orphans(const std::string& channel_id,
-                          std::shared_ptr<Channel> channel) {
-    auto oit = orphan_subscribers_.find(channel_id);
-    if (oit == orphan_subscribers_.end() || oit->second.empty())
-        return;
-
-    auto cit = orphan_constraints_.find(channel_id);
-    std::vector<std::vector<std::shared_ptr<Constraint>>> constraints_snapshot;
-    if (cit != orphan_constraints_.end()) {
-        constraints_snapshot = cit->second;
-    }
-
-    size_t i = 0;
-    for (auto& sub : oit->second) {
-        if (i < constraints_snapshot.size()) {
-            channel->add_subscriber(sub, constraints_snapshot[i]);
-        } else {
-            channel->add_subscriber(sub);
-        }
-        ++i;
-    }
-
-    oit->second.clear();
-    if (cit != orphan_constraints_.end())
-        cit->second.clear();
-
-    orphan_subscribers_.erase(oit);
-    if (cit != orphan_constraints_.end())
-        orphan_constraints_.erase(cit);
 }
 
 } // namespace loomchannel

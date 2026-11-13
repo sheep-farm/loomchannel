@@ -11,6 +11,7 @@
  */
 
 #include <any>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -78,19 +79,25 @@ private:
                        std::vector<std::shared_ptr<Constraint>>> constraints_by_subscriber_;
 
     std::queue<QueuedMessage> queue_;
-    bool delivering_ = false;
+    // True while a thread owns the delivery loop (single deliverer at a time).
+    std::atomic<bool> delivering_{false};
 
-    bool passes_constraints(std::shared_ptr<Subscriber> subscriber,
-                            MessageEvent event) const;
+    bool passes_constraints(const std::vector<std::shared_ptr<Constraint>>& constraints,
+                            MessageEvent event,
+                            const std::any& content) const;
 
     void notify_subscriber(std::shared_ptr<Subscriber> subscriber,
-                           MessageEvent event);
+                           MessageEvent event,
+                           const std::any& content,
+                           const std::vector<std::shared_ptr<Constraint>>& constraints);
 
     /**
      * @brief Drains the internal queue delivering each message to every
-     * subscriber. Must be called while holding mutex_.
+     * subscriber, notifying outside the lock so callbacks may re-enter the
+     * channel or Bus. Only one thread delivers at a time; queue order is
+     * preserved.
      */
-    void deliver_queued();
+    void pump();
 };
 
 } // namespace loomchannel

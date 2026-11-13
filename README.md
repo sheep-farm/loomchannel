@@ -20,7 +20,7 @@ Four roles, fully separated:
 ## Key features
 
 - **Zero GUI dependency:** compiles in any C++17 environment (console, server, embedded, etc.).
-- **Thread-safe:** `std::mutex` plus snapshot of subscribers before notifying (no deadlock in callbacks).
+- **Thread-safe:** `std::mutex` plus snapshot of subscribers before notifying (no deadlock in callbacks). Subscriber callbacks may safely re-enter the `Bus` (e.g. call `Bus::instance().channel(...)`) because notifications are delivered outside the Bus lock.
 - **Orphans:** a subscriber may subscribe to a channel that does not exist yet; it is delivered as soon as the channel is opened.
 - **RAII:** `subscribe()` returns a `Connection` that automatically unsubscribes when it goes out of scope.
 - **Generic payload, zero-copy delivery:** `std::any` allows transporting any type without coupling sender and receiver to a common type. The payload is delivered as `const std::any&`, avoiding copies during notification (similar to borrowing in Rust). The reference is valid only for the duration of `on_message`; copy explicitly if you need to retain it.

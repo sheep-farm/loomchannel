@@ -13,6 +13,7 @@
 #include <loomchannel/any_helpers.hpp>
 
 #include <any>
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <thread>
@@ -21,6 +22,52 @@
 using namespace loomchannel;
 
 namespace {
+
+// ---------------------------------------------------------------------------
+// Subscriber whose callback re-enters the Bus. Regression tests for the
+// deadlock where Bus notified subscribers while holding its own mutex.
+// ---------------------------------------------------------------------------
+class BusTouchingSubscriber : public Subscriber {
+public:
+    enum class Action { None, HasChannel, Channel };
+
+    BusTouchingSubscriber(std::string channel_id, Action action)
+        : channel_id_(std::move(channel_id)), action_(action) {}
+
+    void on_message(void* sender, MessageEvent event, const std::any& payload) override {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            messages_.push_back({sender, event});
+        }
+        auto& bus = Bus::instance();
+        switch (action_) {
+            case Action::None:
+                break;
+            case Action::HasChannel:
+                (void)bus.has_channel(channel_id_);
+                break;
+            case Action::Channel:
+                (void)bus.channel(channel_id_);
+                break;
+        }
+    }
+
+    size_t count() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return messages_.size();
+    }
+
+private:
+    struct Message {
+        void* sender;
+        MessageEvent event;
+    };
+
+    std::string channel_id_;
+    Action action_;
+    mutable std::mutex mutex_;
+    std::vector<Message> messages_;
+};
 
 // ---------------------------------------------------------------------------
 // Test subscriber that records received messages
@@ -143,34 +190,36 @@ TEST_F(BusTest, BusSubscribeDoesNotCrash) {
     EXPECT_FALSE(conn.connected());
 }
 
-TEST_F(BusTest, OrphanSubscriberDoesNotCrash) {
+TEST_F(BusTest, OrphanSubscriberReceivesAfterChannelOpens) {
     auto& bus = Bus::instance();
     auto channel = std::make_shared<DefaultChannel>(channel_name(), nullptr);
 
-    // Simulate orphan: subscribe to channel before it exists via Bus
+    // Subscribe before the channel exists: subscriber becomes an orphan.
     auto sub = std::make_shared<RecordingSubscriber>();
-    bus.subscribe(channel_name(), sub);
+    auto conn = bus.subscribe(channel_name(), sub);
+    EXPECT_TRUE(conn.connected());
 
-    // Open channel - should not crash
+    // Open the channel: orphans are migrated and receive the current content.
     bus.open(channel_name(), channel);
+
     auto ch = bus.channel(channel_name());
     ASSERT_NE(ch, nullptr);
 
-    // Publish real content through the channel
+    // Publish real content through the channel.
     ch->set_content(std::string("hello"));
-
-    // Directly add the subscriber to the channel and verify delivery works
-    ch->add_subscriber(sub);
-    sub->clear();
-    ch->set_content(std::string("hello again"));
 
     auto msgs = sub->get_messages();
     bool received = false;
     for (const auto& m : msgs) {
-        if (m.payload == "hello again")
+        if (m.payload == "hello")
             received = true;
     }
     EXPECT_TRUE(received);
+
+    // Subscriber must also be reachable via Bus::channel() subscribers.
+    auto registered = ch->get_subscribers();
+    bool found = std::find(registered.begin(), registered.end(), sub) != registered.end();
+    EXPECT_TRUE(found);
 }
 
 TEST_F(BusTest, UnsubscribeStopsDelivery) {
@@ -240,6 +289,49 @@ TEST_F(BusTest, ConstraintFiltersMessages) {
 
     ch->set_content(std::string("http://example.com"));
     EXPECT_EQ(sub->count(), 1u); // filtered out
+}
+
+TEST_F(BusTest, SubscriberCallbackCanReenterBus) {
+    auto& bus = Bus::instance();
+    auto channel = std::make_shared<DefaultChannel>(channel_name(), nullptr);
+    bus.open(channel_name(), channel);
+
+    // The callback calls Bus::has_channel() and Bus::channel() while it is
+    // being notified (subscribe, broadcast and unsubscribe paths). This must
+    // not deadlock.
+    auto sub = std::make_shared<BusTouchingSubscriber>(
+        channel_name(), BusTouchingSubscriber::Action::HasChannel);
+    auto conn = bus.subscribe(channel_name(), sub);
+    EXPECT_TRUE(conn.connected());
+    EXPECT_GE(sub->count(), 1u);
+
+    auto ch = bus.channel(channel_name());
+    ASSERT_NE(ch, nullptr);
+    ch->set_content(std::string("reentrant"));
+
+    // Immediate delivery on subscribe + broadcast of "reentrant".
+    EXPECT_GE(sub->count(), 2u);
+
+    conn.disconnect(); // remove_subscriber notifies Stop with the callback active
+    EXPECT_FALSE(conn.connected());
+}
+
+TEST_F(BusTest, SubscriberCallbackCanLookupChannelDuringBroadcast) {
+    auto& bus = Bus::instance();
+    auto channel = std::make_shared<DefaultChannel>(channel_name(), nullptr);
+    bus.open(channel_name(), channel);
+
+    auto sub = std::make_shared<BusTouchingSubscriber>(
+        channel_name(), BusTouchingSubscriber::Action::Channel);
+    auto conn = bus.subscribe(channel_name(), sub);
+    EXPECT_GE(sub->count(), 1u);
+
+    auto ch = bus.channel(channel_name());
+    ASSERT_NE(ch, nullptr);
+    ch->set_content(std::string("lookup"));
+    EXPECT_GE(sub->count(), 2u);
+
+    conn.disconnect();
 }
 
 // ---------------------------------------------------------------------------

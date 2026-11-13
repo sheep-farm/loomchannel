@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+
+include_guard(GLOBAL)
+
+# Determine the installation prefix from the location of this config file
+get_filename_component(loomchannel_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+
+set_and_check(loomchannel_INCLUDE_DIRS "${loomchannel_INSTALL_PREFIX}/include")
+set_and_check(loomchannel_LIBRARIES "${loomchannel_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libloomchannel@CMAKE_STATIC_LIBRARY_SUFFIX@")
+
+check_required_components(loomchannel)
