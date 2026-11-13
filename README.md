@@ -97,19 +97,25 @@ channel->set_content(std::string("hello, world!"));
 
 ## Payload usage contract
 
-The `std::any` delivered to receivers via `const std::any&` is valid **only for the duration of the `on_message` call**.
+The payload is delivered as `const std::any&` pointing to the **channel's own content storage**. The channel keeps the content alive for as long as the channel exists (typically the whole session, while the channel is open on the `Bus`).
 
-Receivers must consume the data immediately (e.g., `any_cast<T>`) and **must not retain the reference** after the callback returns. If you need to keep the value for later use, copy it explicitly:
+Two practical consequences:
+
+1. **Retaining the reference is safe.** A receiver may hold the `const std::any&` beyond the callback (e.g. capture it in a deferred UI callback such as wxWidgets `CallAfter` or a Qt queued invocation). As long as the channel object is alive, the reference stays valid.
+2. **The reference always reflects the latest published state.** `set_content()` replaces the value *in place*, so a retained reference read later returns the newest state, not a snapshot of the moment it was delivered. This is intentional: transmitters publish current state at all times, and receivers treat both fresh and stale states as valid (e.g. a `SqlConnection` channel always carries the current connection state).
+
+If you need to **freeze the value at the moment of delivery** (or hand it to another thread), copy it explicitly:
 
 ```cpp
 void on_message(void* sender, MessageEvent event, const std::any& payload) override {
-    // Consume immediately; do not store &payload or payload itself beyond this call.
-    std::string client_key = any_cast_or<std::string>(payload, std::string{});
-    // use client_key here...
+    // Copy when the value must be frozen at delivery time or cross threads.
+    CallAfter([payload = std::any(payload)]() { ... });
 }
 ```
 
-This model is intentional: the **sender owns the data**, the channel lends the reference during delivery, and receivers are temporary observers.
+**Exception — `OrderedChannel`:** queued messages are delivered as private per-message snapshots (strict ordering requires independent payloads). A retained reference to an `OrderedChannel` payload is only valid for the duration of the callback; copy it if you need it later.
+
+This model is intentional: the **channel owns the state**, transmitters publish it continuously, and receivers are observers of the current state.
 
 ## License
 

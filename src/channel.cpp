@@ -30,7 +30,6 @@ Channel& DefaultChannel::set_open(bool open) {
         // Channel closed: notify all that it stopped (Stop).
         std::vector<std::shared_ptr<Subscriber>> snapshot;
         std::vector<std::vector<std::shared_ptr<Constraint>>> constraints;
-        std::any content;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot = subscribers_;
@@ -40,11 +39,13 @@ Channel& DefaultChannel::set_open(bool open) {
                                           ? it->second
                                           : std::vector<std::shared_ptr<Constraint>>{});
             }
-            content = content_;
         }
         // Notify outside the lock: callbacks may re-enter the channel or Bus.
+        // The payload is a reference to the channel's own storage: it stays
+        // valid while the channel lives and always reflects the latest
+        // published state.
         for (size_t i = 0; i < snapshot.size(); ++i) {
-            notify_subscriber(snapshot[i], MessageEvent::Stop, content, constraints[i]);
+            notify_subscriber(snapshot[i], MessageEvent::Stop, content_, constraints[i]);
         }
     }
     return *this;
@@ -74,7 +75,6 @@ std::any DefaultChannel::content() const {
 void DefaultChannel::broadcast() {
     std::vector<std::shared_ptr<Subscriber>> snapshot;
     std::vector<std::vector<std::shared_ptr<Constraint>>> constraints;
-    std::any content;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!open_)
@@ -86,12 +86,14 @@ void DefaultChannel::broadcast() {
                                       ? it->second
                                       : std::vector<std::shared_ptr<Constraint>>{});
         }
-        content = content_;
     }
 
     // Notify outside the lock: callbacks may re-enter the channel or Bus.
+    // The payload is a reference to the channel's own storage: it stays
+    // valid while the channel lives and always reflects the latest
+    // published state.
     for (size_t i = 0; i < snapshot.size(); ++i) {
-        notify_subscriber(snapshot[i], MessageEvent::Broadcast, content, constraints[i]);
+        notify_subscriber(snapshot[i], MessageEvent::Broadcast, content_, constraints[i]);
     }
 }
 
@@ -106,7 +108,6 @@ void DefaultChannel::add_subscriber(
         return;
 
     MessageEvent immediate_event;
-    std::any immediate_content;
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -120,11 +121,11 @@ void DefaultChannel::add_subscriber(
 
         // Immediate delivery: Broadcast if open, Stop if closed.
         immediate_event = open_ ? MessageEvent::Broadcast : MessageEvent::Stop;
-        immediate_content = content_;
     }
 
     // Notify outside the lock: callbacks may re-enter the channel or Bus.
-    notify_subscriber(subscriber, immediate_event, immediate_content, constraints);
+    // The payload is a reference to the channel's own storage (see broadcast).
+    notify_subscriber(subscriber, immediate_event, content_, constraints);
 }
 
 void DefaultChannel::remove_subscriber(std::shared_ptr<Subscriber> subscriber) {
@@ -132,7 +133,6 @@ void DefaultChannel::remove_subscriber(std::shared_ptr<Subscriber> subscriber) {
         return;
 
     std::vector<std::shared_ptr<Constraint>> constraints;
-    std::any content;
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -147,28 +147,27 @@ void DefaultChannel::remove_subscriber(std::shared_ptr<Subscriber> subscriber) {
         }
 
         subscribers_.erase(it);
-        content = content_;
     }
 
     // Notify Stop after removal, outside the lock: callbacks may re-enter
     // the channel or Bus (e.g. the subscriber re-plugging elsewhere).
-    notify_subscriber(subscriber, MessageEvent::Stop, content, constraints);
+    // Payload is a reference to the channel's own storage (see broadcast).
+    notify_subscriber(subscriber, MessageEvent::Stop, content_, constraints);
 }
 
 void DefaultChannel::reset() {
     std::vector<std::shared_ptr<Subscriber>> snapshot;
     std::vector<std::vector<std::shared_ptr<Constraint>>> constraints;
-    std::any content;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         snapshot = subscribers_;
         subscribers_.clear();
         constraints_by_subscriber_.clear();
-        content = content_;
     }
     // Notify outside the lock to avoid deadlock in the subscriber's callback.
+    // Payload is a reference to the channel's own storage (see broadcast).
     for (size_t i = 0; i < snapshot.size(); ++i) {
-        notify_subscriber(snapshot[i], MessageEvent::Stop, content, constraints[i]);
+        notify_subscriber(snapshot[i], MessageEvent::Stop, content_, constraints[i]);
     }
 }
 
