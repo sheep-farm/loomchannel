@@ -1,5 +1,0 @@
-if(EXISTS "/home/flavio/Work/loomchannel/build_tests/loomchannel_tests_e3b0c442_tests.cmake")
-  include("/home/flavio/Work/loomchannel/build_tests/loomchannel_tests_e3b0c442_tests.cmake")
-else()
-  add_test(loomchannel_tests_NOT_BUILT loomchannel_tests_NOT_BUILT)
-endif()
