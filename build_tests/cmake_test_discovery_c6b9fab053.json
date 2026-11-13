@@ -1,0 +1,79 @@
+{
+  "tests": 11,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "BusTest",
+      "tests": 8,
+      "testsuite": [
+        {
+          "name": "OpenAndCloseChannel",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 80
+        },
+        {
+          "name": "OpenDoesNotOverwriteExistingChannel",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 93
+        },
+        {
+          "name": "SubscribersReceivePublishedContent",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 104
+        },
+        {
+          "name": "BusSubscribeDoesNotCrash",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 128
+        },
+        {
+          "name": "OrphanSubscriberDoesNotCrash",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 146
+        },
+        {
+          "name": "UnsubscribeStopsDelivery",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 176
+        },
+        {
+          "name": "ConnectionRAIIUnsubscribesOnScopeExit",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 206
+        },
+        {
+          "name": "ConstraintFiltersMessages",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 224
+        }
+      ]
+    },
+    {
+      "name": "DefaultChannelTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "SubscriberReceivesStopOnClose",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 248
+        },
+        {
+          "name": "NewSubscriberGetsCurrentContent",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 263
+        }
+      ]
+    },
+    {
+      "name": "OrderedChannelTest",
+      "tests": 1,
+      "testsuite": [
+        {
+          "name": "MultipleThreadsPreserveAllMessages",
+          "file": "\/home\/flavio\/Work\/loomchannel\/tests\/test_bus.cpp",
+          "line": 280
+        }
+      ]
+    }
+  ]
+}

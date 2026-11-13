@@ -18,7 +18,6 @@
 #include <string>
 #include <utility>
 
-#include "loomchannel/bus.hpp"
 #include "loomchannel/channel.hpp"
 #include "loomchannel/constraint.hpp"
 #include "loomchannel/message_event.hpp"
