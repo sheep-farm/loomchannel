@@ -11,6 +11,8 @@ qt_standard_project_setup()
 add_executable(loomchannel_qtdemo
     src/main.cpp
     src/channels.h
+    src/text_constraints.h
+    src/text_constraints.cpp
     src/sender_dock.h
     src/sender_dock.cpp
     src/receiver_base.h
@@ -19,6 +21,8 @@ add_executable(loomchannel_qtdemo
     src/receiver_dock.cpp
     src/filtered_receiver_dock.h
     src/filtered_receiver_dock.cpp
+    src/keyword_receiver_dock.h
+    src/keyword_receiver_dock.cpp
 )
 
 target_link_libraries(loomchannel_qtdemo PRIVATE

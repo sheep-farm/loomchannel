@@ -24,16 +24,20 @@ SOURCES += \
 SOURCES += \
     src/main.cpp \
     src/sender_dock.cpp \
+    src/text_constraints.cpp \
     src/receiver_base.cpp \
     src/receiver_dock.cpp \
-    src/filtered_receiver_dock.cpp
+    src/filtered_receiver_dock.cpp \
+    src/keyword_receiver_dock.cpp
 
 HEADERS += \
     src/channels.h \
+    src/text_constraints.h \
     src/sender_dock.h \
     src/receiver_base.h \
     src/receiver_dock.h \
-    src/filtered_receiver_dock.h
+    src/filtered_receiver_dock.h \
+    src/keyword_receiver_dock.h
 
 # Offscreen verification: run with a file path argument to save a
 # screenshot and exit (QT_QPA_PLATFORM=offscreen).
