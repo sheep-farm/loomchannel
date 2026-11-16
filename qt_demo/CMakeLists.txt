@@ -13,16 +13,14 @@ add_executable(loomchannel_qtdemo
     src/channels.h
     src/text_constraints.h
     src/text_constraints.cpp
-    src/sender_dock.h
-    src/sender_dock.cpp
-    src/receiver_base.h
-    src/receiver_base.cpp
-    src/receiver_dock.h
-    src/receiver_dock.cpp
-    src/filtered_receiver_dock.h
-    src/filtered_receiver_dock.cpp
-    src/keyword_receiver_dock.h
-    src/keyword_receiver_dock.cpp
+    src/transmitter_pane.h
+    src/transmitter_pane.cpp
+    src/editor_pane.h
+    src/editor_pane.cpp
+    src/receiver_pane.h
+    src/receiver_pane.cpp
+    src/keyword_pane.h
+    src/keyword_pane.cpp
 )
 
 target_link_libraries(loomchannel_qtdemo PRIVATE

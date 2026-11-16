@@ -51,34 +51,36 @@ loomchannel/
 ├── example/
 │   ├── main.cpp           # console example (no GUI)
 │   └── advanced.cpp       # console example (ordered channel, constraints)
-├── qt_demo/               # Qt6 Dock Windows demo (optional, skipped without Qt6)
+├── qt_demo/               # Qt Creator-style demo (optional, skipped without Qt6)
 │   ├── CMakeLists.txt
 │   ├── loomchannel_qtdemo.pro  # qmake project, opens in Qt Creator
-│   └── src/               # transmitter dock + three receiver docks
+│   └── src/               # fixed areas: project / editor / transmitter / output panes
 └── tests/
 ```
 
-## Qt6 Dock Windows demo
+## Qt Creator-style demo
 
-A Qt6 Widgets demo with two `QDockWidget`s talking through the bus:
+A Qt6 demo laid out like an IDE (splitters + tabs, no `QDockWidget`):
+project list on the left, syntax-highlighted editor tabs in the center,
+the transmitter as a right tool pane, output panes as bottom tabs, and
+even the status bar as one more subscriber — all talking through the bus:
 
-- **Transmissor** — owns the channel, opens/closes it, and publishes text
-  messages. A message sent while the channel is closed is stored in the
-  channel and delivered on the next open.
-- **Receptor** — subscribes before the channel exists (orphan subscription)
-  and shows the channel state (ABERTO/FECHADO) driven purely by the bus
-  events: `Broadcast` on open/publish, `Stop` on close.
-- **Receptor filtrado** — same subscription plus a per-subscriber
-  `Constraint` (`PrefixConstraint`): only messages starting with `jdbc:`
-  reach it. `Stop` always passes the filter so the dock never misses a
-  close.
-- **Receptor por palavra** — two named constraints composed on one
-  subscription (`KeywordConstraint` + `LengthConstraint`, AND
-  semantics). The keyword is editable in the dock and is mutated in
-  place, without resubscribing.
+- **Transmissor** — owns the channel, opens/closes it; `Executar`
+  (Ctrl+R) publishes the current editor tab line by line. Lines run with
+  the channel closed are stored and delivered on the next open.
+- **Console** — plain receiver: shows every message and the channel
+  state (ABERTO/FECHADO), driven purely by the bus events (`Broadcast`
+  on open/publish, `Stop` on close).
+- **jdbc:** — same subscription plus a per-subscriber `Constraint`
+  (`PrefixConstraint`): only messages starting with `jdbc:` reach it.
+- **Palavra** — two named constraints composed on one subscription
+  (`KeywordConstraint` + `LengthConstraint`, AND semantics). The keyword
+  is editable in the pane and is mutated in place, without resubscribing.
 - `text_constraints.h` — the demo's named constraints, built on a small
   `TextConstraint` base that keeps the state-event policy in one place
   (Stop always passes, empty text always passes).
+- `editor_pane.{h,cpp}` — `QPlainTextEdit` + `QSyntaxHighlighter` for the
+  toy econometric language (keywords, numbers, strings, `# comments`).
 
 ```bash
 cd /home/flavio/Work/loomchannel

@@ -1,24 +1,22 @@
 #pragma once
 
 /**
- * @file keyword_receiver_dock.h
- * @brief Third receiver: two named constraints composed on one
+ * @file keyword_pane.h
+ * @brief Output pane with two named constraints composed on one
  *        subscription (keyword + max length), with the keyword retargeted
  *        from the UI without resubscribing.
  */
 
 #include <memory>
 
-#include "receiver_base.h"
+#include "receiver_pane.h"
 #include "text_constraints.h"
 
 class QLineEdit;
 
-class KeywordReceiverDock : public ReceiverBase {
-    Q_OBJECT
-
+class KeywordPane : public ReceiverPane {
 public:
-    explicit KeywordReceiverDock(QWidget* parent = nullptr);
+    explicit KeywordPane(QWidget* parent = nullptr);
 
 private:
     QLineEdit* keyword_edit_;

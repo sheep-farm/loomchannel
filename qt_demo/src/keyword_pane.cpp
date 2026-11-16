@@ -1,9 +1,8 @@
-#include "keyword_receiver_dock.h"
+#include "keyword_pane.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QWidget>
 
 namespace {
 
@@ -12,18 +11,18 @@ constexpr std::size_t kMaxLength = 80;
 
 } // namespace
 
-KeywordReceiverDock::KeywordReceiverDock(QWidget* parent)
-    : ReceiverBase(tr("Receptor por palavra"),
-                   tr("só entrega mensagens contendo \"%1\" e com até %2 "
+KeywordPane::KeywordPane(QWidget* parent)
+    : ReceiverPane(
+          QObject::tr("só entrega mensagens contendo \"%1\" e com até %2 "
                       "caracteres")
-                       .arg(kDefaultKeyword)
-                       .arg(kMaxLength),
-                   parent) {
+              .arg(kDefaultKeyword)
+              .arg(kMaxLength),
+          parent) {
     // Keyword editor, shown between the note and the log.
     auto* row = new QWidget(this);
     auto* row_layout = new QHBoxLayout(row);
     row_layout->setContentsMargins(0, 0, 0, 0);
-    auto* label = new QLabel(tr("palavra:"), row);
+    auto* label = new QLabel(QObject::tr("palavra:"), row);
     keyword_edit_ = new QLineEdit(row);
     keyword_edit_->setText(kDefaultKeyword);
     keyword_edit_->setClearButtonEnabled(true);
@@ -37,8 +36,8 @@ KeywordReceiverDock::KeywordReceiverDock(QWidget* parent)
         keyword_edit_->text().toStdString());
     connect(keyword_edit_, &QLineEdit::textChanged, this, [this](const QString& text) {
         constraint_->set_keyword(text.toStdString());
-        set_note(tr("só entrega mensagens contendo \"%1\" e com até %2 "
-                    "caracteres")
+        set_note(QObject::tr("só entrega mensagens contendo \"%1\" e com até "
+                             "%2 caracteres")
                      .arg(text)
                      .arg(kMaxLength));
     });
