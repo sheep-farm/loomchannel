@@ -7,6 +7,7 @@
 
 #include <any>
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "loomchannel/message_event.hpp"
