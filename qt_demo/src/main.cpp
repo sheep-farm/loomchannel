@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include <QTimer>
 
+#include "filtered_receiver_dock.h"
 #include "receiver_dock.h"
 #include "sender_dock.h"
 
@@ -26,18 +27,21 @@ int main(int argc, char** argv) {
     hint->setText(QApplication::translate(
         "main",
         "O transmissor publica mensagens de texto no canal \"chat\".\n"
-        "O receptor está inscrito no bus e acompanha o estado do canal:\n"
-        "recebe Broadcast ao abrir/publicar e Stop ao fechar.\n"
-        "Mensagem enviada com o canal fechado é armazenada no canal\n"
-        "e entregue quando ele reabrir."));
+        "Dois receptores estão inscritos no bus e acompanham o estado do\n"
+        "canal: recebem Broadcast ao abrir/publicar e Stop ao fechar.\n"
+        "O receptor filtrado assina com uma Constraint e só aceita\n"
+        "mensagens que começam com \"jdbc:\". Mensagem enviada com o\n"
+        "canal fechado é armazenada no canal e entregue quando ele reabrir."));
     window.setCentralWidget(hint);
 
     auto* sender = new SenderDock(&window);
     auto* receiver = new ReceiverDock(&window);
+    auto* filtered = new FilteredReceiverDock(&window);
     window.addDockWidget(Qt::LeftDockWidgetArea, sender);
     window.addDockWidget(Qt::RightDockWidgetArea, receiver);
+    window.addDockWidget(Qt::BottomDockWidgetArea, filtered);
 
-    window.resize(860, 480);
+    window.resize(860, 620);
     window.show();
 
     if (!screenshot_path.isEmpty()) {

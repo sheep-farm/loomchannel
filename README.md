@@ -53,7 +53,8 @@ loomchannel/
 │   └── advanced.cpp       # console example (ordered channel, constraints)
 ├── qt_demo/               # Qt6 Dock Windows demo (optional, skipped without Qt6)
 │   ├── CMakeLists.txt
-│   └── src/               # transmitter/receiver docks + main
+│   ├── loomchannel_qtdemo.pro  # qmake project, opens in Qt Creator
+│   └── src/               # transmitter dock + plain/filtered receiver docks
 └── tests/
 ```
 
@@ -67,6 +68,9 @@ A Qt6 Widgets demo with two `QDockWidget`s talking through the bus:
 - **Receptor** — subscribes before the channel exists (orphan subscription)
   and shows the channel state (ABERTO/FECHADO) driven purely by the bus
   events: `Broadcast` on open/publish, `Stop` on close.
+- **Receptor filtrado** — same subscription plus a per-subscriber
+  `Constraint`: only messages starting with `jdbc:` reach it. `Stop`
+  always passes the filter so the dock never misses a close.
 
 ```bash
 cd /home/flavio/Work/loomchannel

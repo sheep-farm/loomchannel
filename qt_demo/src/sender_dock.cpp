@@ -6,15 +6,9 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "channels.h"
 #include "loomchannel/bus.hpp"
 #include "loomchannel/channel.hpp"
-
-namespace {
-
-// Same identifier the ReceiverDock subscribes to.
-constexpr char kChannel[] = "chat";
-
-} // namespace
 
 SenderDock::SenderDock(QWidget* parent)
     : QDockWidget(tr("Transmissor"), parent) {
@@ -54,7 +48,7 @@ SenderDock::~SenderDock() {
     // Close the channel on the way out so subscribers see a proper Stop
     // instead of losing the sender silently.
     if (channel_ && channel_->is_open()) {
-        loomchannel::Bus::instance().close(kChannel);
+        loomchannel::Bus::instance().close(loomdemo::kChat);
     }
 }
 
@@ -63,15 +57,15 @@ void SenderDock::toggle_channel(bool open) {
         if (!channel_) {
             // This dock is the sender: the channel points back at it.
             channel_ = std::make_shared<loomchannel::DefaultChannel>(
-                kChannel, static_cast<void*>(this));
+                loomdemo::kChat, static_cast<void*>(this));
         }
         // Registers the channel (or reattaches the same object after a
         // close) and delivers the current content to subscribers.
-        loomchannel::Bus::instance().open(kChannel, channel_);
+        loomchannel::Bus::instance().open(loomdemo::kChat, channel_);
     } else {
         // Subscribers stay on the bus as orphans and are reattached on
         // the next open, so nothing needs to be done with them here.
-        loomchannel::Bus::instance().close(kChannel);
+        loomchannel::Bus::instance().close(loomdemo::kChat);
     }
     refresh_status();
 }
@@ -87,7 +81,7 @@ void SenderDock::send() {
         // Sending with the toggle untouched still has to work: the channel
         // is created closed, so the message is stored but not delivered.
         channel_ = std::make_shared<loomchannel::DefaultChannel>(
-            kChannel, static_cast<void*>(this));
+            loomdemo::kChat, static_cast<void*>(this));
     }
 
     // Publishes; with the channel closed it only updates the stored
