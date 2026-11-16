@@ -76,6 +76,10 @@ cmake --build build_qt --target loomchannel_qtdemo
 ./build_qt/qt_demo/loomchannel_qtdemo shot.png   # offscreen screenshot, then exit
 ```
 
+Or open `qt_demo/loomchannel_qtdemo.pro` in **Qt Creator** (`File >
+Open File or Project...`) — the qmake project compiles the library
+sources in, so it builds standalone with no extra setup.
+
 ## Build
 
 ```bash
