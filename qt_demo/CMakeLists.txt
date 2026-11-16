@@ -11,6 +11,8 @@ qt_standard_project_setup()
 add_executable(loomchannel_qtdemo
     src/main.cpp
     src/channels.h
+    src/app_theme.h
+    src/app_theme.cpp
     src/text_constraints.h
     src/text_constraints.cpp
     src/transmitter_pane.h

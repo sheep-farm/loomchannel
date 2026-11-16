@@ -15,6 +15,7 @@
 #include "loomchannel/any_helpers.hpp"
 #include "loomchannel/bus.hpp"
 
+#include "app_theme.h"
 #include "channels.h"
 #include "editor_pane.h"
 #include "keyword_pane.h"
@@ -24,7 +25,7 @@
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
     QApplication::setApplicationName("loomchannel-qtdemo");
-    QApplication::setStyle("Fusion");
+    apply_qtcreator_theme();
 
     QMainWindow window;
     window.setWindowTitle(QApplication::translate(

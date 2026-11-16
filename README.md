@@ -79,8 +79,12 @@ even the status bar as one more subscriber — all talking through the bus:
 - `text_constraints.h` — the demo's named constraints, built on a small
   `TextConstraint` base that keeps the state-event policy in one place
   (Stop always passes, empty text always passes).
-- `editor_pane.{h,cpp}` — `QPlainTextEdit` + `QSyntaxHighlighter` for the
-  toy econometric language (keywords, numbers, strings, `# comments`).
+- `editor_pane.{h,cpp}` — `QPlainTextEdit` with a line-number gutter and
+  current-line highlight, plus `QSyntaxHighlighter` for the toy
+  econometric language (keywords, numbers, strings, `# comments`).
+- `app_theme.{h,cpp}` — dark flat theme in the Qt Creator spirit:
+  Fusion + dark `QPalette` + a small stylesheet (flat tabs with accent
+  underline, hairline splitters, borderless bars).
 
 ```bash
 cd /home/flavio/Work/loomchannel

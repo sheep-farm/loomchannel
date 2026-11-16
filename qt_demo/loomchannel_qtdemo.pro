@@ -23,6 +23,7 @@ SOURCES += \
 
 SOURCES += \
     src/main.cpp \
+    src/app_theme.cpp \
     src/transmitter_pane.cpp \
     src/editor_pane.cpp \
     src/receiver_pane.cpp \
@@ -31,6 +32,7 @@ SOURCES += \
 
 HEADERS += \
     src/channels.h \
+    src/app_theme.h \
     src/text_constraints.h \
     src/transmitter_pane.h \
     src/editor_pane.h \
