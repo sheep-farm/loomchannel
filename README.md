@@ -49,8 +49,31 @@ loomchannel/
 │   ├── channel.cpp
 │   └── ordered_channel.cpp
 ├── example/
-│   └── main.cpp           # console example (no GUI)
+│   ├── main.cpp           # console example (no GUI)
+│   └── advanced.cpp       # console example (ordered channel, constraints)
+├── qt_demo/               # Qt6 Dock Windows demo (optional, skipped without Qt6)
+│   ├── CMakeLists.txt
+│   └── src/               # transmitter/receiver docks + main
 └── tests/
+```
+
+## Qt6 Dock Windows demo
+
+A Qt6 Widgets demo with two `QDockWidget`s talking through the bus:
+
+- **Transmissor** — owns the channel, opens/closes it, and publishes text
+  messages. A message sent while the channel is closed is stored in the
+  channel and delivered on the next open.
+- **Receptor** — subscribes before the channel exists (orphan subscription)
+  and shows the channel state (ABERTO/FECHADO) driven purely by the bus
+  events: `Broadcast` on open/publish, `Stop` on close.
+
+```bash
+cd /home/flavio/Work/loomchannel
+cmake -S . -B build_qt
+cmake --build build_qt --target loomchannel_qtdemo
+./build_qt/qt_demo/loomchannel_qtdemo            # run
+./build_qt/qt_demo/loomchannel_qtdemo shot.png   # offscreen screenshot, then exit
 ```
 
 ## Build

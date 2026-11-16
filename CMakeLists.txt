@@ -40,6 +40,19 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------
+# Qt6 Dock Window demo (optional; skipped when Qt6 is unavailable)
+# ---------------------------------------------------------------
+option(BUILD_QT_DEMO "Build the Qt6 Dock Window demo" ON)
+if(BUILD_QT_DEMO)
+    find_package(Qt6 COMPONENTS Widgets QUIET)
+    if(Qt6_FOUND)
+        add_subdirectory(qt_demo)
+    else()
+        message(STATUS "Qt6 not found - skipping the Qt6 Dock Window demo")
+    endif()
+endif()
+
+# ---------------------------------------------------------------
 # Unit tests (Google Test)
 # ---------------------------------------------------------------
 option(BUILD_TESTS "Build unit tests" OFF)
