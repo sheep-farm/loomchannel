@@ -50,13 +50,35 @@ loomchannel/
 │   └── ordered_channel.cpp
 ├── example/
 │   ├── main.cpp           # console example (no GUI)
-│   └── advanced.cpp       # console example (ordered channel, constraints)
+│   ├── advanced.cpp       # console example (ordered channel, constraints)
+│   └── threads.cpp        # two workers + a consumer thread that sleeps
 ├── qt_demo/               # Qt Creator-style demo (optional, skipped without Qt6)
 │   ├── CMakeLists.txt
 │   ├── loomchannel_qtdemo.pro  # qmake project, opens in Qt Creator
 │   └── src/               # fixed areas: project / editor / transmitter / output panes
 └── tests/
 ```
+
+## Threads: a receiver that sleeps
+
+`on_message()` runs on the publisher's thread — loomchannel is push-based,
+so a consumer with slow, heavy work should not block the publisher. The
+pattern in `example/threads.cpp`:
+
+- the subscriber enqueues a copy of the payload and notifies a
+  `condition_variable` (fast, on the publisher's thread);
+- the consumer thread blocks in `cv.wait()` at **zero CPU cost** while
+  idle, wakes on the first message, and drains everything already queued
+  before sleeping again;
+- `Stop` (channel closed) makes the consumer drain and exit — no thread
+  is killed, nothing loops;
+- two workers publish concurrently on an `OrderedChannel`, so the consumer
+  observes one global arrival order.
+
+A sample run prints `11 messages in 2 wakeups` — the thread slept the
+rest of the time. The queueing is the consumer's business, not the
+library's: the same shape a GUI adapter uses to marshal to its event
+loop.
 
 ## Qt Creator-style demo
 

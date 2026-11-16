@@ -34,9 +34,13 @@ target_link_libraries(loomchannel_example PRIVATE loomchannel)
 add_executable(loomchannel_advanced example/advanced.cpp)
 target_link_libraries(loomchannel_advanced PRIVATE loomchannel)
 
+add_executable(loomchannel_threads example/threads.cpp)
+target_link_libraries(loomchannel_threads PRIVATE loomchannel)
+
 if(NOT MSVC)
     target_compile_options(loomchannel_example PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(loomchannel_advanced PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(loomchannel_threads PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 # ---------------------------------------------------------------
