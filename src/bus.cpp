@@ -182,9 +182,8 @@ Connection Bus::subscribe(std::string channel_id,
                      std::move(constraints));
 }
 
-void Bus::unsubscribe(std::string channel_id,
-                      std::shared_ptr<Subscriber> subscriber) {
-    if (!subscriber)
+void Bus::unsubscribe(std::string channel_id, std::shared_ptr<Subscriber> subscriber) {
+    if (!subscriber || channel_id.empty())
         return;
 
     std::shared_ptr<Channel> target;
@@ -205,21 +204,28 @@ void Bus::unsubscribe(std::string channel_id,
 
     std::lock_guard<std::mutex> lock(mutex_);
     auto oit = orphan_subscribers_.find(channel_id);
-    if (oit != orphan_subscribers_.end()) {
-        auto& vec = oit->second;
-        vec.erase(std::remove(vec.begin(), vec.end(), subscriber), vec.end());
+    if (oit == orphan_subscribers_.end())
+        return;
+    auto& vec = oit->second;
+    auto sit = std::find(vec.begin(), vec.end(), subscriber);
+    if (sit == vec.end())
+        return;
 
-        // Clear constraints for this orphan channel (they are reapplied
-        // only when the channel opens again).
-        auto cit = orphan_constraints_.find(channel_id);
-        if (cit != orphan_constraints_.end()) {
+    // Remove by INDEX so subscribers and constraints stay aligned:
+    // erasing one orphan's constraints wholesale would shift the others'
+    // constraints onto the wrong subscribers at migration time.
+    const auto index = (size_t)std::distance(vec.begin(), sit);
+    vec.erase(sit);
+    auto cit = orphan_constraints_.find(channel_id);
+    if (cit != orphan_constraints_.end()) {
+        if (index < cit->second.size())
+            cit->second.erase(cit->second.begin() +
+                              (std::ptrdiff_t)index);
+        if (vec.empty())
             orphan_constraints_.erase(cit);
-        }
-
-        if (vec.empty()) {
-            orphan_subscribers_.erase(oit);
-        }
     }
+    if (vec.empty())
+        orphan_subscribers_.erase(oit);
 }
 
 std::shared_ptr<Channel> Bus::channel(std::string channel_id) const {

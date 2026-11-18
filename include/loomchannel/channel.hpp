@@ -46,6 +46,14 @@ public:
 
     /** Sets the channel content and, if open, broadcasts it. */
     virtual Channel& set_content(std::any content) = 0;
+
+    /// Deleted on purpose: a string literal decays to `const char*`, and
+    /// receivers doing `any_cast<std::string>` would SILENTLY miss the
+    /// message. Publish `std::string` explicitly — a legible compile
+    /// error beats a silent runtime miss.
+    Channel& set_content(const char*) = delete;
+    Channel& set_content(char*) = delete;
+
     virtual std::any content() const = 0;
 
     /** Delivers the current content to all subscribed subscribers. */
@@ -93,6 +101,12 @@ public:
     bool is_open() const override;
 
     Channel& set_content(std::any content) override;
+
+    /// Same guard as the base interface: the derived override hides the
+    /// base's deleted overloads, so the guard must repeat here.
+    Channel& set_content(const char*) = delete;
+    Channel& set_content(char*) = delete;
+
     std::any content() const override;
 
     void broadcast() override;

@@ -44,6 +44,12 @@ public:
     bool is_open() const override;
 
     Channel& set_content(std::any content) override;
+
+    /// Same guard as the base interface: the derived override hides the
+    /// base's deleted overloads, so the guard must repeat here.
+    Channel& set_content(const char*) = delete;
+    Channel& set_content(char*) = delete;
+
     std::any content() const override;
 
     void broadcast() override;

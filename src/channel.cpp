@@ -61,9 +61,9 @@ Channel& DefaultChannel::set_content(std::any content) {
         std::lock_guard<std::mutex> lock(mutex_);
         content_ = std::move(content);
     }
-    if (is_open()) {
-        broadcast();
-    }
+    // broadcast() re-checks open_ under the lock (a concurrent close in
+    // between must not deliver) — no extra is_open() round-trip needed.
+    broadcast();
     return *this;
 }
 

@@ -78,11 +78,14 @@ public:
         void* sender = nullptr;
         MessageEvent event = MessageEvent::Stop;
         std::string payload;
+        bool has_payload = false;
     };
 
     void on_message(void* sender, MessageEvent event, const std::any& payload) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        messages_.push_back({sender, event, any_cast_or<std::string>(payload, std::string{})});
+        messages_.push_back({sender, event,
+                             any_cast_or<std::string>(payload, std::string{}),
+                             payload.has_value()});
     }
 
     std::vector<Message> get_messages() const {
@@ -220,6 +223,40 @@ TEST_F(BusTest, OrphanSubscriberReceivesAfterChannelOpens) {
     auto registered = ch->get_subscribers();
     bool found = std::find(registered.begin(), registered.end(), sub) != registered.end();
     EXPECT_TRUE(found);
+}
+
+TEST_F(BusTest, UnsubscribingOneOrphanKeepsOthersConstraintsAligned) {
+    auto& bus = Bus::instance();
+    auto channel = std::make_shared<DefaultChannel>(channel_name(), nullptr);
+
+    auto allow_all = make_constraint(
+        [](void*, MessageEvent, const std::any&) { return true; });
+    auto reject_all = make_constraint(
+        [](void*, MessageEvent, const std::any&) { return false; });
+
+    // A subscribes first (orphan) with a permissive constraint, then
+    // leaves while the channel is still closed. B remains an orphan
+    // with a REJECTING constraint.
+    auto a = std::make_shared<RecordingSubscriber>();
+    auto b = std::make_shared<RecordingSubscriber>();
+    {
+        Connection ca = bus.subscribe(channel_name(), a, {allow_all});
+    } // A's orphan entry (and ONLY A's constraint) must go away here.
+    Connection cb = bus.subscribe(channel_name(), b, {reject_all});
+
+    // The channel opens: orphans migrate in order, each with its OWN
+    // constraint (index-aligned bookkeeping).
+    bus.open(channel_name(), channel);
+    auto ch = bus.channel(channel_name());
+    ASSERT_NE(ch, nullptr);
+    ch->set_content(std::string("hello"));
+
+    // A left before the open — nothing. B's rejecting constraint must
+    // have migrated WITH B: zero deliveries. (The old bug erased the
+    // whole constraint list for the channel, so B's rejection was lost
+    // and this delivery went through.)
+    EXPECT_EQ(a->get_messages().size(), 0u);
+    EXPECT_EQ(b->get_messages().size(), 0u);
 }
 
 TEST_F(BusTest, UnsubscribeStopsDelivery) {
@@ -364,6 +401,36 @@ TEST(DefaultChannelTest, NewSubscriberGetsCurrentContent) {
     ASSERT_EQ(msgs.size(), 1u);
     EXPECT_EQ(msgs[0].event, MessageEvent::Broadcast);
     EXPECT_EQ(msgs[0].payload, "current");
+}
+
+/// The immediate-delivery edge, documented: subscribing to an OPEN
+/// channel with NO content yet still delivers one Broadcast — with an
+/// EMPTY payload. Receivers distinguish "nothing published yet" by
+/// checking payload.has_value().
+TEST(DefaultChannelTest, NewSubscriberOnEmptyOpenChannelGetsBroadcastWithEmptyPayload) {
+    auto channel = std::make_shared<DefaultChannel>("ch", nullptr);
+    channel->set_open(true); // no set_content ever happened
+
+    auto sub = std::make_shared<RecordingSubscriber>();
+    channel->add_subscriber(sub);
+
+    auto msgs = sub->get_messages();
+    ASSERT_EQ(msgs.size(), 1u);
+    EXPECT_EQ(msgs[0].event, MessageEvent::Broadcast);
+    EXPECT_FALSE(msgs[0].has_payload);
+}
+
+/// Subscribe to a CLOSED channel: immediate Stop — the subscriber learns
+/// the state at once, not only on the next event.
+TEST(DefaultChannelTest, NewSubscriberOnClosedChannelGetsStopImmediately) {
+    auto channel = std::make_shared<DefaultChannel>("ch", nullptr);
+
+    auto sub = std::make_shared<RecordingSubscriber>();
+    channel->add_subscriber(sub);
+
+    auto msgs = sub->get_messages();
+    ASSERT_EQ(msgs.size(), 1u);
+    EXPECT_EQ(msgs[0].event, MessageEvent::Stop);
 }
 
 // ---------------------------------------------------------------------------

@@ -184,6 +184,39 @@ void on_message(void* sender, MessageEvent event, const std::any& payload) overr
 
 This model is intentional: the **channel owns the state**, transmitters publish it continuously, and receivers are observers of the current state.
 
+## The two rules that bite
+
+Two behaviors surprise almost everyone on first contact. Both are tested in `tests/test_bus.cpp`.
+
+### Rule 1 — delivery is synchronous, on the publisher's thread
+
+`set_content()` does not queue anything (with `DefaultChannel`): when you publish, **your thread** calls every matching subscriber's `on_message()` before `set_content()` returns. This is what makes the channel a live view of shared state — but it means the publisher inherits the cost of all listeners, and a listener must not block.
+
+Consequences:
+
+- A receiver that touches a GUI widget **must not** touch it directly — it is on the publisher's thread. Dispatch instead (Qt: `QMetaObject::invokeMethod(..., Qt::QueuedConnection)` or `CallAfter` in wx); see `example/threads.cpp` for the cross-thread pattern.
+- A receiver may safely re-enter the `Bus` (lookup, subscribe) because notifications happen outside the `Bus` lock.
+- Never publish while holding a lock the listeners also need.
+- **Concurrency boundary:** `DefaultChannel` assumes publications are serialized (single sender, or externally synchronized). If several threads publish the same channel concurrently, use `OrderedChannel` — it queues publications under its mutex and delivers strictly in arrival order.
+
+### Rule 2 — subscribing delivers the current state immediately, even if it is empty
+
+The moment `subscribe`/`add_subscriber` runs, the receiver gets one synchronous event describing the channel's current state:
+
+- channel **open**: a `Broadcast` — with the current content, **or with an EMPTY payload (`!payload.has_value()`) if nothing was ever published**. Check `payload.has_value()` before `any_cast`; an empty payload is a legitimate "state not yet known" delivery, not garbage.
+- channel **closed**: a `Stop`, immediately.
+
+A receiver therefore learns the state at subscription time — but only by inspecting `has_value()`. Skipping that check is the classic bug: the empty first broadcast slips through and `any_cast` throws.
+
+### Bonus rule — payload must be `std::string`
+
+The channel transports `std::any`, but the ecosystem contract (Bus examples, Hayashi Studio, the demos) is that content is `std::string`. Publishing a string literal is a silent trap: `set_content("hi")` stores a `const char*`, and receivers doing `any_cast<std::string>` miss the message with no error anywhere. So the deleted-overload guard makes it a compile error:
+
+```cpp
+channel->set_content("hi");                 // compile error — on purpose
+channel->set_content(std::string("hi"));    // correct
+```
+
 ## License
 
 MIT License. See `LICENSE` file for details.
